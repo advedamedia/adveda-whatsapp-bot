@@ -586,9 +586,28 @@ const sessions = {};
 
 // Helper to query Gemini API
 async function fetchGeminiResponse(history) {
+  const currentKolkataTime = new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' });
+  const currentDayOfWeek = new Date().toLocaleDateString('en-US', { timeZone: 'Asia/Kolkata', weekday: 'long' });
+  
+  const dynamicInstruction = `
+${systemInstruction}
+
+---
+CRITICAL TIME CONTEXT FOR SCHEDULING:
+- Today is: ${currentDayOfWeek}, ${currentKolkataTime} (Kolkata/India Timezone).
+- Current Year: ${new Date().getFullYear()}.
+- Always calculate relative date terms (like "aaj", "kal", "parso" / day after tomorrow, "agla hafta", "weekend", "next Monday") relative to today's date (${currentKolkataTime}).
+- For example, if today is June 3, 2026, then:
+  * "aaj" is June 3, 2026
+  * "kal" (tomorrow) is June 4, 2026
+  * "parso" (day after tomorrow) is June 5, 2026
+  * "narso" is June 6, 2026
+  * "next Monday" is June 8, 2026.
+`;
+
   const payload = {
     contents: history,
-    systemInstruction: { parts: [{ text: systemInstruction }] },
+    systemInstruction: { parts: [{ text: dynamicInstruction }] },
     generationConfig: { temperature: 0.5, topP: 0.9, maxOutputTokens: 1000 }
   };
 
@@ -654,6 +673,40 @@ async function sendWhatsAppMessage(phone_number_id, to, text) {
   }
 }
 
+// Helper function to download media (voice/audio) from Meta Graph API
+async function downloadMetaMedia(mediaId) {
+  const token = process.env.WHATSAPP_ACCESS_TOKEN || "YOUR_META_ACCESS_TOKEN";
+  try {
+    // 1. Get media URL
+    const mediaResponse = await fetch(`https://graph.facebook.com/v19.0/${mediaId}`, {
+      headers: { "Authorization": `Bearer ${token}` }
+    });
+    if (!mediaResponse.ok) {
+      throw new Error(`Meta Media API error: ${mediaResponse.status}`);
+    }
+    const mediaData = await mediaResponse.json();
+    const downloadUrl = mediaData.url;
+    
+    // 2. Download the binary media buffer
+    const fileResponse = await fetch(downloadUrl, {
+      headers: { "Authorization": `Bearer ${token}` }
+    });
+    if (!fileResponse.ok) {
+      throw new Error(`Meta Media download file error: ${fileResponse.status}`);
+    }
+    
+    // Convert response binary to buffer (compatible with node-fetch 2.x buffer() method)
+    const buffer = await fileResponse.buffer();
+    return {
+      buffer: buffer,
+      mimeType: mediaData.mime_type || "audio/ogg"
+    };
+  } catch (error) {
+    console.error("Error downloading media from Meta:", error);
+    return null;
+  }
+}
+
 // Meta Webhook Verification Endpoint (GET)
 // Meta sends a GET request here when you first configure your webhook in their developer portal
 app.get('/webhook', (req, res) => {
@@ -695,13 +748,36 @@ app.post('/webhook', async (req, res) => {
       const value = change?.value;
       const message = value?.messages?.[0];
 
-      // Process only text messages (ignore delivery receipts, read receipts, image messages etc.)
-      if (message && message.type === 'text') {
+      // Process text AND audio/voice messages
+      if (message && (message.type === 'text' || message.type === 'audio' || message.type === 'voice')) {
         const fromNumber = message.from; // User's WhatsApp number (e.g. "919999988888")
-        const incomingMsg = message.text.body.trim();
         const phone_number_id = value.metadata?.phone_number_id; // Meta Phone Number ID
+        
+        let incomingMsg = "";
+        let audioPart = null;
 
-        console.log(`Received WhatsApp message from ${fromNumber}: "${incomingMsg}"`);
+        if (message.type === 'text') {
+          incomingMsg = message.text.body.trim();
+          console.log(`Received WhatsApp text message from ${fromNumber}: "${incomingMsg}"`);
+        } else {
+          const audioId = message.audio ? message.audio.id : message.voice.id;
+          console.log(`Received WhatsApp audio message from ${fromNumber} with ID: ${audioId}`);
+          
+          // Download audio
+          const media = await downloadMetaMedia(audioId);
+          if (media && media.buffer) {
+            const base64Audio = media.buffer.toString("base64");
+            audioPart = {
+              inlineData: {
+                mimeType: media.mimeType,
+                data: base64Audio
+              }
+            };
+            incomingMsg = "[Sent a voice note/audio message. Please listen to the attached audio files and transcribe/understand it. Reply in Hinglish text in the same language/dialect]";
+          } else {
+            incomingMsg = "[Sent an audio message, but failed to download]";
+          }
+        }
 
         // 3. Initialize session if not present
         if (!sessions[fromNumber]) {
@@ -713,7 +789,10 @@ app.post('/webhook', async (req, res) => {
 
         // 4. Add user message to history
         const history = sessions[fromNumber];
-        history.push({ role: "user", parts: [{ text: incomingMsg }] });
+        history.push({
+          role: "user",
+          parts: audioPart ? [{ text: incomingMsg }, audioPart] : [{ text: incomingMsg }]
+        });
 
         let geminiRaw;
         try {
