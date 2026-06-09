@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Chatbot SaaS — Dashboard</title>
+  <link rel="stylesheet" href="style.css"/>
+</head>
+<body>
+
+<!-- ══════════════════════════════════
+     LOGIN PAGE
+══════════════════════════════════ -->
+<div id="loginPage" class="login-page">
+  <div class="login-card">
+    <div class="login-logo">
+      <div class="logo-icon">💬</div>
+      <div>
+        <h1>ChatBot SaaS</h1>
+        <p>WhatsApp AI Platform</p>
+      </div>
+    </div>
+    <h2>Welcome back</h2>
+    <p class="subtitle">Sign in to manage your clients & leads</p>
+    <div id="loginError" class="login-error">❌ Incorrect password. Please try again.</div>
+    <div class="form-group">
+      <label for="passwordInput">Admin Password</label>
+      <input type="password" id="passwordInput" placeholder="Enter admin password" autocomplete="current-password"/>
+    </div>
+    <button class="btn btn-primary btn-lg" onclick="doLogin()" id="loginBtn">
+      Sign In →
+    </button>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════
+     APP LAYOUT
+══════════════════════════════════ -->
+<div id="appLayout" class="app-layout" style="display:none">
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-icon">💬</div>
+      <div>
+        <div class="logo-text">ChatBot SaaS</div>
+        <div class="logo-sub">WhatsApp AI Platform</div>
+      </div>
+    </div>
+
+    <nav class="sidebar-nav">
+      <div class="nav-section">
+        <div class="nav-section-title">Overview</div>
+        <a class="nav-item active" onclick="showPage('dashboard')" id="nav-dashboard">
+          <span class="nav-icon">📊</span> Dashboard
+        </a>
+      </div>
+      <div class="nav-section">
+        <div class="nav-section-title">Leads</div>
+        <a class="nav-item" onclick="showPage('leads')" id="nav-leads">
+          <span class="nav-icon">👥</span> All Leads
+          <span class="nav-badge" id="hotBadge">0</span>
+        </a>
+      </div>
+      <div class="nav-section">
+        <div class="nav-section-title">Clients</div>
+        <a class="nav-item" onclick="showPage('clients')" id="nav-clients">
+          <span class="nav-icon">🏢</span> My Clients
+        </a>
+        <a class="nav-item" onclick="showPage('onboarding')" id="nav-onboarding">
+          <span class="nav-icon">➕</span> Add New Client
+        </a>
+      </div>
+    </nav>
+
+    <div class="sidebar-footer">
+      <select id="clientFilterSelect" class="client-selector" onchange="onClientFilter()">
+        <option value="">All Clients</option>
+      </select>
+      <button class="btn btn-secondary" style="width:100%;font-size:13px" onclick="doLogout()">🚪 Logout</button>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <main class="main-content">
+
+    <!-- ── DASHBOARD PAGE ── -->
+    <div id="page-dashboard" class="page active">
+      <div class="page-header">
+        <div>
+          <h1>📊 Dashboard</h1>
+          <p>Live overview of all leads and activity</p>
+        </div>
+        <button class="btn btn-secondary btn-sm" onclick="loadDashboard()">🔄 Refresh</button>
+      </div>
+
+      <div class="stats-grid" id="statsGrid">
+        <div class="stat-card total"><span class="stat-icon">👥</span><div class="stat-label">Total Leads</div><div class="stat-value" id="stat-total">—</div></div>
+        <div class="stat-card hot"><span class="stat-icon">🔥</span><div class="stat-label">Hot Leads</div><div class="stat-value" id="stat-hot">—</div></div>
+        <div class="stat-card warm"><span class="stat-icon">🟡</span><div class="stat-label">Warm Leads</div><div class="stat-value" id="stat-warm">—</div></div>
+        <div class="stat-card cold"><span class="stat-icon">🔵</span><div class="stat-label">Cold Leads</div><div class="stat-value" id="stat-cold">—</div></div>
+        <div class="stat-card visits"><span class="stat-icon">📅</span><div class="stat-label">Today's Visits</div><div class="stat-value" id="stat-visits">—</div></div>
+        <div class="stat-card calls"><span class="stat-icon">📞</span><div class="stat-label">Today's Calls</div><div class="stat-value" id="stat-calls">—</div></div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">🔥 Hot Leads</span>
+          <button class="btn btn-secondary btn-sm" onclick="showPage('leads'); setFilter('HOT')">View All Hot →</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr>
+              <th>Name</th><th>Phone</th><th>Budget</th><th>Location</th><th>Score</th><th>Stage</th><th>Updated</th>
+            </tr></thead>
+            <tbody id="hotLeadsBody">
+              <tr><td colspan="7" style="text-align:center;padding:40px;color:var(--text-muted)">Loading...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── LEADS PAGE ── -->
+    <div id="page-leads" class="page">
+      <div class="page-header">
+        <div>
+          <h1>👥 All Leads</h1>
+          <p>Complete lead database from all chatbot conversations</p>
+        </div>
+        <button class="btn btn-secondary btn-sm" onclick="loadLeads()">🔄 Refresh</button>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title" id="leadsCount">All Leads</span>
+          <div class="filters-row">
+            <div class="search-box">
+              <input type="text" id="searchInput" placeholder="Search name or phone..." oninput="loadLeads()"/>
+            </div>
+            <select class="filter-select" id="scoreFilter" onchange="loadLeads()">
+              <option value="">All Scores</option>
+              <option value="HOT">🔥 Hot</option>
+              <option value="WARM">🟡 Warm</option>
+              <option value="COLD">🔵 Cold</option>
+              <option value="UNKNOWN">❓ Unknown</option>
+            </select>
+            <select class="filter-select" id="stageFilter" onchange="loadLeads()">
+              <option value="">All Stages</option>
+              <option value="new">New</option>
+              <option value="qualified">Qualified</option>
+              <option value="site_visit_scheduled">Visit Scheduled</option>
+              <option value="call_scheduled">Call Scheduled</option>
+              <option value="converted">Converted</option>
+              <option value="lost">Lost</option>
+            </select>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr>
+              <th>Name</th><th>Phone</th><th>Budget</th><th>Location</th><th>Purpose</th><th>Score</th><th>Stage</th><th>Site Visit</th><th>Updated</th>
+            </tr></thead>
+            <tbody id="leadsBody">
+              <tr><td colspan="9" style="text-align:center;padding:40px;color:var(--text-muted)">Loading...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── CLIENTS PAGE ── -->
+    <div id="page-clients" class="page">
+      <div class="page-header">
+        <div>
+          <h1>🏢 My Clients</h1>
+          <p>Manage all chatbot clients</p>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="showPage('onboarding')">➕ Add New Client</button>
+      </div>
+      <div class="clients-grid" id="clientsGrid">
+        <div style="text-align:center;padding:40px;color:var(--text-muted)">Loading...</div>
+      </div>
+    </div>
+
+    <!-- ── ONBOARDING PAGE ── -->
+    <div id="page-onboarding" class="page">
+      <div class="page-header">
+        <div>
+          <h1>➕ Add New Client</h1>
+          <p>Set up a new WhatsApp chatbot in minutes</p>
+        </div>
+      </div>
+
+      <div class="wizard-steps">
+        <div class="wizard-step active" id="wstep-1" onclick="goWizard(1)">
+          <span class="step-num">1</span>WhatsApp Setup
+        </div>
+        <div class="wizard-step" id="wstep-2" onclick="goWizard(2)">
+          <span class="step-num">2</span>Client Details
+        </div>
+        <div class="wizard-step" id="wstep-3" onclick="goWizard(3)">
+          <span class="step-num">3</span>AI Config
+        </div>
+        <div class="wizard-step" id="wstep-4" onclick="goWizard(4)">
+          <span class="step-num">4</span>Webhook
+        </div>
+      </div>
+
+      <!-- Step 1: WhatsApp API Guide -->
+      <div class="wizard-panel active" id="wpanel-1">
+        <div class="card" style="padding:28px">
+          <h2 style="margin-bottom:6px">📱 WhatsApp Business API Setup Guide</h2>
+          <p style="color:var(--text-secondary);margin-bottom:24px">Client ko ye steps khud karne hain. Unhe ye guide share karein.</p>
+
+          <div class="guide-steps">
+            <div class="guide-step">
+              <div class="guide-step-num">1</div>
+              <div class="guide-step-content">
+                <h4>Meta Business Account Banayein</h4>
+                <p>Client browser mein jaaye: <strong style="color:#67e8f9">business.facebook.com</strong> → "Create Account" → Company name, email, phone enter karein.</p>
+              </div>
+            </div>
+            <div class="guide-step">
+              <div class="guide-step-num">2</div>
+              <div class="guide-step-content">
+                <h4>Business Verification Complete Karein</h4>
+                <p>Business Suite → Settings → Security Centre → "Start Verification". GST certificate, incorporation certificate, ya utility bill upload karein. (2-5 din lag sakte hain)</p>
+              </div>
+            </div>
+            <div class="guide-step">
+              <div class="guide-step-num">3</div>
+              <div class="guide-step-content">
+                <h4>Meta Developer Account + App Banayein</h4>
+                <p><strong style="color:#67e8f9">developers.facebook.com</strong> → "My Apps" → "Create App" → "Business" type select karein → App banayein.</p>
+              </div>
+            </div>
+            <div class="guide-step">
+              <div class="guide-step-num">4</div>
+              <div class="guide-step-content">
+                <h4>WhatsApp Product Add Karein</h4>
+                <p>App Dashboard mein "Add Product" → "WhatsApp" → "Set Up" → Apna Business Account select karein.</p>
+              </div>
+            </div>
+            <div class="guide-step">
+              <div class="guide-step-num">5</div>
+              <div class="guide-step-content">
+                <h4>Phone Number Register Karein + OTP Verify Karein</h4>
+                <p>WhatsApp → Configuration → "Add Phone Number" → Number enter karein → OTP verify karein.</p>
+              </div>
+            </div>
+            <div class="guide-step">
+              <div class="guide-step-num">6</div>
+              <div class="guide-step-content">
+                <h4>Access Token Generate Karein</h4>
+                <p>WhatsApp → API Setup section mein → "Phone Number" note karein. System User Access Token banana: Business Settings → System Users → Token generate karein. Yeh token aapko next step mein dena hai.</p>
+              </div>
+            </div>
+            <div class="guide-step">
+              <div class="guide-step-num">7</div>
+              <div class="guide-step-content">
+                <h4>Phone Number ID Copy Karein</h4>
+                <p>WhatsApp → API Setup → "Phone Number ID" (numbers ka ek lambi string) copy karein. Yeh bhi aapko next step mein dena hai.</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="alert alert-info" style="margin-top:24px">
+            ✅ Jab client ne <strong>Access Token</strong> aur <strong>Phone Number ID</strong> de diye, tab Next Step mein details fill karein.
+          </div>
+
+          <div style="display:flex;justify-content:flex-end;margin-top:24px">
+            <button class="btn btn-primary" onclick="goWizard(2)">Next: Client Details →</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 2: Client Details Form -->
+      <div class="wizard-panel" id="wpanel-2">
+        <div class="card" style="padding:28px">
+          <h2 style="margin-bottom:6px">🏢 Client Details</h2>
+          <p style="color:var(--text-secondary);margin-bottom:24px">Client ki basic information aur WhatsApp credentials fill karein.</p>
+
+          <div id="onboardingMsg"></div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label>Company Name <span class="required">*</span></label>
+              <input type="text" id="ob_name" placeholder="e.g. Potential Infinity"/>
+            </div>
+            <div class="form-group">
+              <label>Business Type</label>
+              <select id="ob_business_type">
+                <option>Real Estate</option>
+                <option>Education</option>
+                <option>Healthcare</option>
+                <option>E-Commerce</option>
+                <option>Restaurant / Food</option>
+                <option>Travel & Tourism</option>
+                <option>Finance / Insurance</option>
+                <option>Other</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label>WhatsApp Business Number</label>
+              <input type="text" id="ob_whatsapp_number" placeholder="e.g. +91 98765 43210"/>
+            </div>
+            <div class="form-group">
+              <label>Contact Person Name</label>
+              <input type="text" id="ob_contact_person" placeholder="e.g. Mishti Sharma"/>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Contact Person Phone</label>
+            <input type="text" id="ob_contact_phone" placeholder="e.g. 9999888877"/>
+          </div>
+
+          <hr class="form-divider"/>
+          <p style="font-size:13px;font-weight:600;color:var(--text-secondary);margin-bottom:16px">🔑 WhatsApp API Credentials (from Meta Developer Dashboard)</p>
+
+          <div class="form-group">
+            <label>Phone Number ID <span class="required">*</span></label>
+            <input type="text" id="ob_phone_number_id" placeholder="e.g. 123456789012345"/>
+            <div class="input-hint">WhatsApp → API Setup → Phone Number ID</div>
+          </div>
+
+          <div class="form-group">
+            <label>Access Token <span class="required">*</span></label>
+            <input type="text" id="ob_access_token" placeholder="EAAxxxxxxxx..."/>
+            <div class="input-hint">System User Access Token from Meta Business Settings</div>
+          </div>
+
+          <div class="form-group">
+            <label>Verify Token (auto-generated, ya custom set karein)</label>
+            <input type="text" id="ob_verify_token" placeholder="Will be auto-generated if left blank"/>
+            <div class="input-hint">Yeh token Meta Webhook setup mein use hoga</div>
+          </div>
+
+          <div style="display:flex;gap:10px;justify-content:space-between;margin-top:24px">
+            <button class="btn btn-secondary" onclick="goWizard(1)">← Back</button>
+            <button class="btn btn-primary" onclick="goWizard(3)">Next: AI Config →</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 3: AI Configuration -->
+      <div class="wizard-panel" id="wpanel-3">
+        <div class="card" style="padding:28px">
+          <h2 style="margin-bottom:6px">🤖 AI Configuration</h2>
+          <p style="color:var(--text-secondary);margin-bottom:24px">Bot ki personality, instructions aur knowledge base set karein.</p>
+
+          <div class="form-group">
+            <label>System Prompt <span class="required">*</span></label>
+            <textarea id="ob_system_prompt" rows="12" placeholder="Bot ki poori instructions yahan paste karein...&#10;&#10;Example:&#10;You are [Bot Name], a [role] for [company name].&#10;Speak in Hinglish...&#10;Your goal is to..."></textarea>
+            <div class="input-hint">Antigravity mein naya chat karo aur wahan se apna system prompt generate karwao, phir yahan paste karo.</div>
+          </div>
+
+          <div class="form-group">
+            <label>Knowledge Base / Products (JSON format)</label>
+            <textarea id="ob_knowledge_base" rows="8" placeholder='[&#10;  {&#10;    "id": "product-1",&#10;    "name": "Product Name",&#10;    "price": "₹X",&#10;    "description": "..."&#10;  }&#10;]'></textarea>
+            <div class="input-hint">Client ke products/services ka data JSON format mein. Leave blank if not needed.</div>
+          </div>
+
+          <div class="form-group">
+            <label>Custom Gemini API Key (optional)</label>
+            <input type="text" id="ob_gemini_key" placeholder="Leave blank to use shared key"/>
+            <div class="input-hint">Agar client ki apni API key hai, yahan paste karo. Warna shared key use hogi.</div>
+          </div>
+
+          <div style="display:flex;gap:10px;justify-content:space-between;margin-top:24px">
+            <button class="btn btn-secondary" onclick="goWizard(2)">← Back</button>
+            <button class="btn btn-success" onclick="submitClient()">🚀 Create Client & Activate</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 4: Webhook Setup -->
+      <div class="wizard-panel" id="wpanel-4">
+        <div class="card" style="padding:28px">
+          <h2 style="margin-bottom:6px">🔗 Webhook Setup</h2>
+          <p style="color:var(--text-secondary);margin-bottom:24px">Ab Meta Developer Dashboard mein yeh webhook set karni hai.</p>
+
+          <div class="alert alert-success">✅ Client successfully added kar diya gaya! Ab neeche diye steps follow karein.</div>
+
+          <div class="guide-steps">
+            <div class="guide-step">
+              <div class="guide-step-num">1</div>
+              <div class="guide-step-content">
+                <h4>Meta Developer Dashboard kholein</h4>
+                <p>Client ka <strong style="color:#67e8f9">developers.facebook.com</strong> → Apna App kholein → WhatsApp → Configuration</p>
+              </div>
+            </div>
+            <div class="guide-step">
+              <div class="guide-step-num">2</div>
+              <div class="guide-step-content">
+                <h4>Webhook URL paste karein</h4>
+                <p>"Callback URL" field mein yeh URL paste karein:</p>
+                <div class="copy-box">
+                  <code id="webhookUrl">Loading...</code>
+                  <button class="copy-btn" onclick="copyText('webhookUrl', this)">📋 Copy</button>
+                </div>
+              </div>
+            </div>
+            <div class="guide-step">
+              <div class="guide-step-num">3</div>
+              <div class="guide-step-content">
+                <h4>Verify Token paste karein</h4>
+                <p>"Verify Token" field mein yeh token paste karein:</p>
+                <div class="copy-box">
+                  <code id="verifyTokenDisplay">Loading...</code>
+                  <button class="copy-btn" onclick="copyText('verifyTokenDisplay', this)">📋 Copy</button>
+                </div>
+              </div>
+            </div>
+            <div class="guide-step">
+              <div class="guide-step-num">4</div>
+              <div class="guide-step-content">
+                <h4>"Verify and Save" click karein</h4>
+                <p>Meta webhook verify karega → Green checkmark aayega → "messages" subscription enable karein.</p>
+              </div>
+            </div>
+            <div class="guide-step">
+              <div class="guide-step-num">5</div>
+              <div class="guide-step-content">
+                <h4>Test karein! 🎉</h4>
+                <p>Client ke WhatsApp number par koi message bhejein. Bot se reply aana chahiye.</p>
+              </div>
+            </div>
+          </div>
+
+          <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:24px">
+            <button class="btn btn-primary" onclick="showPage('clients')">View All Clients →</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- ══════════════════════════════════
+     LEAD DETAIL MODAL
+══════════════════════════════════ -->
+<div class="modal-overlay" id="leadModal">
+  <div class="modal" style="max-width:760px">
+    <div class="modal-header">
+      <div>
+        <h2 id="modalLeadName">Lead Details</h2>
+        <p id="modalLeadPhone" style="color:var(--text-secondary)"></p>
+      </div>
+      <button class="modal-close" onclick="closeModal('leadModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="lead-detail-grid" id="leadDetailGrid"></div>
+      <div class="notes-section">
+        <label>📝 Notes / Remarks</label>
+        <textarea id="leadNotes" rows="3" placeholder="Add notes here..."></textarea>
+        <div style="display:flex;gap:10px;margin-top:10px;justify-content:space-between;align-items:center">
+          <div style="display:flex;gap:8px;align-items:center">
+            <span style="font-size:12px;color:var(--text-muted)">Stage:</span>
+            <select id="leadStageSelect" style="font-size:12px;padding:5px 10px">
+              <option value="new">New</option>
+              <option value="qualified">Qualified</option>
+              <option value="site_visit_scheduled">Visit Scheduled</option>
+              <option value="call_scheduled">Call Scheduled</option>
+              <option value="converted">Converted ✅</option>
+              <option value="lost">Lost ❌</option>
+            </select>
+          </div>
+          <button class="btn btn-primary btn-sm" onclick="saveLeadNotes()">Save Changes</button>
+        </div>
+      </div>
+      <div class="conversation-section">
+        <h3>💬 Conversation History</h3>
+        <div class="chat-history" id="chatHistory"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════
+     CLIENT EDIT MODAL
+══════════════════════════════════ -->
+<div class="modal-overlay" id="clientModal">
+  <div class="modal">
+    <div class="modal-header">
+      <div><h2 id="clientModalTitle">Edit Client</h2></div>
+      <button class="modal-close" onclick="closeModal('clientModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="clientModalMsg"></div>
+      <div class="form-group">
+        <label>Status</label>
+        <select id="edit_status">
+          <option value="active">Active ✅</option>
+          <option value="inactive">Inactive ⏸️</option>
+          <option value="setup">Setup Mode 🔧</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>System Prompt</label>
+        <textarea id="edit_system_prompt" rows="10"></textarea>
+      </div>
+      <div class="form-group">
+        <label>Knowledge Base (JSON)</label>
+        <textarea id="edit_knowledge_base" rows="6"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('clientModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveClientEdit()">Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
