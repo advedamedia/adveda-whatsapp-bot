@@ -429,7 +429,7 @@ let currentWizardStep = 1;
 function resetWizard() {
   goWizard(1);
   ['ob_name','ob_business_type','ob_whatsapp_number','ob_contact_person','ob_contact_phone',
-   'ob_phone_number_id','ob_access_token','ob_verify_token','ob_system_prompt','ob_knowledge_base','ob_gemini_key']
+   'ob_phone_number_id','ob_access_token','ob_verify_token','ob_system_prompt','ob_knowledge_base','ob_gemini_key','ob_password']
     .forEach(id => {
       const el = document.getElementById(id);
       if (el) {
@@ -477,7 +477,7 @@ async function submitClient() {
     whatsapp_number: document.getElementById('ob_whatsapp_number').value.trim(),
     phone_number_id,
     access_token,
-    verify_token: document.getElementById('ob_verify_token').value.trim() || undefined,
+    verify_token: document.getElementById('ob_password').value.trim() || document.getElementById('ob_verify_token').value.trim() || undefined,
     system_prompt,
     knowledge_base,
     gemini_api_key: document.getElementById('ob_gemini_key').value.trim() || undefined,
