@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS clients (
   gemini_api_key TEXT,
   contact_person TEXT,
   contact_phone TEXT,
+  contact_email TEXT,
   status TEXT DEFAULT 'active' CHECK (status IN ('active', 'inactive', 'setup')),
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()

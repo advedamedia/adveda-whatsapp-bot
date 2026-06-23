@@ -437,6 +437,12 @@ app.get('/api/clients', adminAuth, async (req, res) => {
     .from('clients')
     .select('id, name, business_type, whatsapp_number, phone_number_id, status, contact_person, contact_phone, created_at')
     .order('created_at', { ascending: false });
+// GET /api/clients — List all clients
+app.get('/api/clients', adminAuth, async (req, res) => {
+  const { data, error } = await supabase
+    .from('clients')
+    .select('id, name, business_type, whatsapp_number, phone_number_id, status, contact_person, contact_phone, contact_email, created_at')
+    .order('created_at', { ascending: false });
   if (error) return res.status(500).json({ error: error.message });
   res.json(data);
 });
@@ -459,7 +465,7 @@ app.post('/api/clients', adminAuth, async (req, res) => {
   const {
     name, business_type, whatsapp_number, phone_number_id,
     access_token, verify_token, system_prompt, knowledge_base,
-    gemini_api_key, contact_person, contact_phone
+    gemini_api_key, contact_person, contact_phone, contact_email
   } = req.body;
 
   if (!name || !phone_number_id || !access_token || !system_prompt) {
@@ -476,7 +482,7 @@ app.post('/api/clients', adminAuth, async (req, res) => {
       access_token, verify_token: vToken, system_prompt,
       knowledge_base: knowledge_base || [],
       gemini_api_key: gemini_api_key || null,
-      contact_person, contact_phone,
+      contact_person, contact_phone, contact_email,
       status: 'active'
     })
     .select()
@@ -491,7 +497,7 @@ app.put('/api/clients/:id', adminAuth, async (req, res) => {
   const allowedFields = [
     'name', 'business_type', 'whatsapp_number', 'phone_number_id',
     'access_token', 'system_prompt', 'knowledge_base',
-    'gemini_api_key', 'contact_person', 'contact_phone', 'status'
+    'gemini_api_key', 'contact_person', 'contact_phone', 'contact_email', 'status', 'verify_token'
   ];
   const updates = {};
   for (const field of allowedFields) {
@@ -650,22 +656,32 @@ app.post('/api/auth', async (req, res) => {
   }
 
   try {
-    // Search client matching either contact_phone, whatsapp_number, or contact_person name, with custom verify_token as password
+    // Search client matching either contact_phone, whatsapp_number, contact_email or contact_person name, with custom verify_token as password
     const { data: clients, error } = await supabase
       .from('clients')
-      .select('id, name, verify_token, whatsapp_number, contact_phone')
+      .select('id, name, verify_token, whatsapp_number, contact_phone, contact_email')
       .eq('status', 'active');
 
     if (error || !clients) return res.status(401).json({ error: 'Invalid credentials' });
 
-    // Validate identifier (phone / whatsapp_number) and verify_token (password)
+    // Validate identifier (phone / email / whatsapp_number) and verify_token (password)
     const cleanId = identifier.replace(/[^0-9]/g, '');
+    const searchEmail = identifier.trim().toLowerCase();
+
     const client = clients.find(c => {
       const cleanWa = (c.whatsapp_number || '').replace(/[^0-9]/g, '');
       const cleanPhone = (c.contact_phone || '').replace(/[^0-9]/g, '');
+      const clientEmail = (c.contact_email || '').trim().toLowerCase();
       const passMatch = c.verify_token === password;
 
-      return passMatch && (cleanWa.endsWith(cleanId) || cleanPhone.endsWith(cleanId) || cleanId === c.phone_number_id);
+      const identifierMatches = (
+        (cleanId && cleanWa.endsWith(cleanId)) || 
+        (cleanId && cleanPhone.endsWith(cleanId)) || 
+        (clientEmail && clientEmail === searchEmail) ||
+        identifier === c.phone_number_id
+      );
+
+      return passMatch && identifierMatches;
     });
 
     if (client) {
@@ -676,6 +692,30 @@ app.post('/api/auth', async (req, res) => {
   }
 
   res.status(401).json({ error: 'Invalid credentials or password' });
+});
+
+// POST /api/auth/forgot — Client forgot password recovery
+app.post('/api/auth/forgot', async (req, res) => {
+  const { email } = req.body;
+  if (!email) return res.status(400).json({ error: 'Email is required' });
+
+  try {
+    const { data, error } = await supabase
+      .from('clients')
+      .select('name, verify_token')
+      .eq('contact_email', email.trim().toLowerCase())
+      .eq('status', 'active')
+      .single();
+
+    if (error || !data) {
+      return res.status(404).json({ error: 'No active client registered with this email address' });
+    }
+
+    // Return the verify token as password recovery details
+    return res.json({ success: true, name: data.name, password: data.verify_token });
+  } catch (e) {
+    return res.status(500).json({ error: 'Database search failed' });
+  }
 });
 
 // ─────────────────────────────────────────────

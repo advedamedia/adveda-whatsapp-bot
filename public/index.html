@@ -26,13 +26,16 @@
     
     <!-- Client Login Input Group -->
     <div class="form-group" id="identifierInputGroup">
-      <label for="identifierInput">WhatsApp Number / Phone</label>
-      <input type="text" id="identifierInput" placeholder="e.g. 9999888877" autocomplete="username"/>
+      <label for="identifierInput">WhatsApp Number / Email</label>
+      <input type="text" id="identifierInput" placeholder="e.g. client@email.com or 9999888877" autocomplete="username"/>
     </div>
     
     <!-- Shared Password Input Group -->
     <div class="form-group">
-      <label for="passwordInput" id="passwordLabel">Client Password</label>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <label for="passwordInput" id="passwordLabel" style="margin-bottom:0">Client Password</label>
+        <a href="#" onclick="showForgotPassword(event)" id="forgotPasswordLink" style="font-size:12px;color:var(--primary);text-decoration:none">Forgot password?</a>
+      </div>
       <input type="password" id="passwordInput" placeholder="Enter your password" autocomplete="current-password"/>
     </div>
     
@@ -328,9 +331,15 @@
             </div>
           </div>
 
-          <div class="form-group">
-            <label>Contact Person Phone</label>
-            <input type="text" id="ob_contact_phone" placeholder="e.g. 9999888877"/>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Contact Person Phone</label>
+              <input type="text" id="ob_contact_phone" placeholder="e.g. 9999888877"/>
+            </div>
+            <div class="form-group">
+              <label>Contact Person Email</label>
+              <input type="email" id="ob_contact_email" placeholder="e.g. client@advedamedia.com"/>
+            </div>
           </div>
 
           <div class="form-group">
@@ -536,6 +545,32 @@
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="closeModal('clientModal')">Cancel</button>
       <button class="btn btn-primary" onclick="saveClientEdit()">Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════
+     FORGOT PASSWORD MODAL
+     ══════════════════════════════════ -->
+<div class="modal-overlay" id="forgotPasswordModal">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-header">
+      <div><h2>Reset Password</h2></div>
+      <button class="modal-close" onclick="closeModal('forgotPasswordModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="forgotModalMsg"></div>
+      <p style="font-size:13px;color:var(--text-secondary);margin-bottom:16px">
+        Apna registered email address enter karein. Agar details match hoti hain, toh hum aapko verify token / password display kar denge.
+      </p>
+      <div class="form-group">
+        <label for="forgotEmailInput">Registered Email Address</label>
+        <input type="email" id="forgotEmailInput" placeholder="e.g. client@email.com"/>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('forgotPasswordModal')">Close</button>
+      <button class="btn btn-primary" onclick="submitForgotPassword()">Find Password</button>
     </div>
   </div>
 </div>

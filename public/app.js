@@ -470,7 +470,7 @@ let currentWizardStep = 1;
 
 function resetWizard() {
   goWizard(1);
-  ['ob_name','ob_business_type','ob_whatsapp_number','ob_contact_person','ob_contact_phone',
+  ['ob_name','ob_business_type','ob_whatsapp_number','ob_contact_person','ob_contact_phone','ob_contact_email',
    'ob_phone_number_id','ob_access_token','ob_verify_token','ob_system_prompt','ob_knowledge_base','ob_gemini_key','ob_password']
     .forEach(id => {
       const el = document.getElementById(id);
@@ -525,6 +525,7 @@ async function submitClient() {
     gemini_api_key: document.getElementById('ob_gemini_key').value.trim() || undefined,
     contact_person: document.getElementById('ob_contact_person').value.trim(),
     contact_phone: document.getElementById('ob_contact_phone').value.trim(),
+    contact_email: document.getElementById('ob_contact_email').value.trim(),
   };
 
   try {
@@ -628,4 +629,47 @@ async function copyText(elemId, btn) {
   btn.textContent = '✅ Copied!';
   btn.classList.add('copied');
   setTimeout(() => { btn.textContent = '📋 Copy'; btn.classList.remove('copied'); }, 2000);
+}
+
+// ══════════════════════════════════
+//  FORGOT PASSWORD ACTIONS
+// ══════════════════════════════════
+function showForgotPassword(e) {
+  e?.preventDefault();
+  document.getElementById('forgotEmailInput').value = '';
+  document.getElementById('forgotModalMsg').innerHTML = '';
+  openModal('forgotPasswordModal');
+}
+
+async function submitForgotPassword() {
+  const email = document.getElementById('forgotEmailInput').value.trim();
+  if (!email) {
+    document.getElementById('forgotModalMsg').innerHTML = '<div class="alert alert-error">❌ Email register hona zaroori hai.</div>';
+    return;
+  }
+
+  const msgDiv = document.getElementById('forgotModalMsg');
+  msgDiv.innerHTML = '<span class="spinner"></span> Searching database...';
+
+  try {
+    const res = await fetch(`${API}/api/auth/forgot`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email })
+    });
+    const data = await res.json();
+    if (res.ok && data.password) {
+      msgDiv.innerHTML = `
+        <div class="alert alert-success" style="line-height:1.6">
+          ✅ Account match ho gaya!<br/>
+          <strong>Client Name:</strong> ${data.name}<br/>
+          <strong>Aapka Password:</strong> <code style="background:rgba(255,255,255,0.15);padding:2px 6px;border-radius:4px;font-family:monospace;font-size:14px">${data.password}</code>
+        </div>
+      `;
+    } else {
+      msgDiv.innerHTML = `<div class="alert alert-error">❌ ${data.error || 'Email match nahi hua.'}</div>`;
+    }
+  } catch (e) {
+    msgDiv.innerHTML = '<div class="alert alert-error">❌ Connection error. Please try again.</div>';
+  }
 }
