@@ -435,12 +435,6 @@ app.post('/webhook', async (req, res) => {
 app.get('/api/clients', adminAuth, async (req, res) => {
   const { data, error } = await supabase
     .from('clients')
-    .select('id, name, business_type, whatsapp_number, phone_number_id, status, contact_person, contact_phone, created_at')
-    .order('created_at', { ascending: false });
-// GET /api/clients — List all clients
-app.get('/api/clients', adminAuth, async (req, res) => {
-  const { data, error } = await supabase
-    .from('clients')
     .select('id, name, business_type, whatsapp_number, phone_number_id, status, contact_person, contact_phone, contact_email, created_at')
     .order('created_at', { ascending: false });
   if (error) return res.status(500).json({ error: error.message });
