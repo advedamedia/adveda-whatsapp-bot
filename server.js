@@ -14,6 +14,11 @@ app.use(bodyParser.json());
 // Serve static dashboard files
 app.use(express.static(path.join(__dirname, 'public')));
 
+// Admin specific dashboard route
+app.get('/admin', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
 const PORT = process.env.PORT || 3000;
 const DEFAULT_GEMINI_KEY = process.env.GEMINI_API_KEY;
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
@@ -630,32 +635,47 @@ app.get('/api/dashboard/stats', adminAuth, async (req, res) => {
 
 // POST /api/auth — Admin or Client login check
 app.post('/api/auth', async (req, res) => {
-  const { password } = req.body;
-  if (!password) return res.status(400).json({ error: 'Password required' });
+  const { password, identifier, isAdmin } = req.body;
 
-  // 1. Check Admin password
-  if (password === ADMIN_PASSWORD) {
-    return res.json({ success: true, token: ADMIN_PASSWORD, role: 'admin' });
+  if (isAdmin) {
+    if (password === ADMIN_PASSWORD) {
+      return res.json({ success: true, token: ADMIN_PASSWORD, role: 'admin' });
+    }
+    return res.status(401).json({ error: 'Invalid admin password' });
   }
 
-  // 2. Check Client passwords in Supabase Database
-  try {
-    const { data, error } = await supabase
-      .from('clients')
-      .select('id, name')
-      .eq('verify_token', password) // Use verify_token as client password or a dedicated field. Let's use verify_token for simplicity or a custom column.
-      .eq('status', 'active')
-      .single();
+  // Client authentication check
+  if (!identifier || !password) {
+    return res.status(400).json({ error: 'Phone/Email and Password are required' });
+  }
 
-    if (data) {
-      // Return a client-prefixed token containing client ID
-      return res.json({ success: true, token: `CLIENT_TOKEN:${data.id}`, role: 'client', clientId: data.id });
+  try {
+    // Search client matching either contact_phone, whatsapp_number, or contact_person name, with custom verify_token as password
+    const { data: clients, error } = await supabase
+      .from('clients')
+      .select('id, name, verify_token, whatsapp_number, contact_phone')
+      .eq('status', 'active');
+
+    if (error || !clients) return res.status(401).json({ error: 'Invalid credentials' });
+
+    // Validate identifier (phone / whatsapp_number) and verify_token (password)
+    const cleanId = identifier.replace(/[^0-9]/g, '');
+    const client = clients.find(c => {
+      const cleanWa = (c.whatsapp_number || '').replace(/[^0-9]/g, '');
+      const cleanPhone = (c.contact_phone || '').replace(/[^0-9]/g, '');
+      const passMatch = c.verify_token === password;
+
+      return passMatch && (cleanWa.endsWith(cleanId) || cleanPhone.endsWith(cleanId) || cleanId === c.phone_number_id);
+    });
+
+    if (client) {
+      return res.json({ success: true, token: `CLIENT_TOKEN:${client.id}`, role: 'client', clientId: client.id });
     }
   } catch (e) {
     console.error('Client auth DB check error:', e);
   }
 
-  res.status(401).json({ error: 'Invalid password' });
+  res.status(401).json({ error: 'Invalid credentials or password' });
 });
 
 // ─────────────────────────────────────────────

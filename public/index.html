@@ -16,20 +16,32 @@
     <div class="login-logo">
       <div class="logo-icon">💬</div>
       <div>
-        <h1>Adveda ChatBot</h1>
-        <p>WhatsApp AI SaaS Platform</p>
+        <h1 id="loginMainTitle">Adveda ChatBot</h1>
+        <p id="loginSubTitle">Client Login Panel</p>
       </div>
     </div>
-    <h2>Welcome back</h2>
-    <p class="subtitle">Sign in to manage your clients & leads</p>
-    <div id="loginError" class="login-error">❌ Incorrect password. Please try again.</div>
-    <div class="form-group">
-      <label for="passwordInput">Admin Password</label>
-      <input type="password" id="passwordInput" placeholder="Enter admin password" autocomplete="current-password"/>
+    <h2 id="loginWelcomeHeader">Client Login</h2>
+    <p class="subtitle" id="loginSubText">Enter your WhatsApp number & client password to manage your leads</p>
+    <div id="loginError" class="login-error">❌ Invalid credentials. Please try again.</div>
+    
+    <!-- Client Login Input Group -->
+    <div class="form-group" id="identifierInputGroup">
+      <label for="identifierInput">WhatsApp Number / Phone</label>
+      <input type="text" id="identifierInput" placeholder="e.g. 9999888877" autocomplete="username"/>
     </div>
-    <button class="btn btn-primary btn-lg" onclick="doLogin()" id="loginBtn">
+    
+    <!-- Shared Password Input Group -->
+    <div class="form-group">
+      <label for="passwordInput" id="passwordLabel">Client Password</label>
+      <input type="password" id="passwordInput" placeholder="Enter your password" autocomplete="current-password"/>
+    </div>
+    
+    <button class="btn btn-primary btn-lg" onclick="doLogin()" id="loginBtn" style="width:100%">
       Sign In →
     </button>
+    <div style="margin-top:20px;text-align:center;font-size:12px;color:var(--text-muted)" id="adminPortalNotice">
+      Are you an administrator? Visit <a href="/admin" style="color:var(--primary);text-decoration:none;font-weight:600">Admin Portal</a>
+    </div>
   </div>
 </div>
 

@@ -19,7 +19,11 @@ function headers() {
 // ══════════════════════════════════
 //  INIT
 // ══════════════════════════════════
+// Check route context
+let isAdminRoute = window.location.pathname.endsWith('/admin');
+
 document.addEventListener('DOMContentLoaded', () => {
+  setupLoginView();
   if (authToken) {
     showApp();
   }
@@ -27,14 +31,47 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('passwordInput').addEventListener('keydown', e => {
     if (e.key === 'Enter') doLogin();
   });
+  if (document.getElementById('identifierInput')) {
+    document.getElementById('identifierInput').addEventListener('keydown', e => {
+      if (e.key === 'Enter') doLogin();
+    });
+  }
 });
+
+function setupLoginView() {
+  if (isAdminRoute) {
+    document.getElementById('loginWelcomeHeader').textContent = 'Admin Portal';
+    document.getElementById('loginSubText').textContent = 'Sign in with your master password to manage clients & configurations';
+    document.getElementById('loginSubTitle').textContent = 'WhatsApp AI SaaS Platform';
+    document.getElementById('passwordLabel').textContent = 'Admin Password';
+    document.getElementById('passwordInput').placeholder = 'Enter admin password';
+    document.getElementById('identifierInputGroup').style.display = 'none';
+    document.getElementById('adminPortalNotice').innerHTML = 'Are you a client? Ask the admin for your credentials.';
+  } else {
+    document.getElementById('loginWelcomeHeader').textContent = 'Client Login';
+    document.getElementById('loginSubText').textContent = 'Enter your WhatsApp number & client password to manage your leads';
+    document.getElementById('loginSubTitle').textContent = 'Client Login Panel';
+    document.getElementById('passwordLabel').textContent = 'Client Password';
+    document.getElementById('passwordInput').placeholder = 'Enter your password';
+    document.getElementById('identifierInputGroup').style.display = 'block';
+    document.getElementById('adminPortalNotice').innerHTML = 'Are you an administrator? Visit <a href="/admin" style="color:var(--primary);text-decoration:none;font-weight:600">Admin Portal</a>';
+  }
+}
 
 // ══════════════════════════════════
 //  LOGIN / LOGOUT
 // ══════════════════════════════════
 async function doLogin() {
   const pw = document.getElementById('passwordInput').value.trim();
+  const idVal = document.getElementById('identifierInput')?.value?.trim() || '';
+  
   if (!pw) return;
+  if (!isAdminRoute && !idVal) {
+    document.getElementById('loginError').textContent = '❌ Please enter your WhatsApp number or Phone.';
+    document.getElementById('loginError').style.display = 'block';
+    return;
+  }
+
   const btn = document.getElementById('loginBtn');
   btn.disabled = true;
   btn.innerHTML = '<span class="spinner"></span> Signing in...';
@@ -43,7 +80,7 @@ async function doLogin() {
     const res = await fetch(`${API}/api/auth`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ password: pw })
+      body: JSON.stringify({ password: pw, identifier: idVal, isAdmin: isAdminRoute })
     });
     const data = await res.json();
     if (res.ok && data.token) {
@@ -54,6 +91,7 @@ async function doLogin() {
       document.getElementById('loginError').style.display = 'none';
       showApp();
     } else {
+      document.getElementById('loginError').textContent = `❌ ${data.error || 'Invalid credentials'}`;
       document.getElementById('loginError').style.display = 'block';
       btn.disabled = false;
       btn.innerHTML = 'Sign In →';
@@ -74,6 +112,10 @@ function doLogout() {
   document.getElementById('appLayout').style.display = 'none';
   document.getElementById('loginPage').style.display = 'flex';
   document.getElementById('passwordInput').value = '';
+  if (document.getElementById('identifierInput')) {
+    document.getElementById('identifierInput').value = '';
+  }
+  setupLoginView();
 }
 
 function showApp() {
