@@ -49,6 +49,8 @@ async function doLogin() {
     if (res.ok && data.token) {
       authToken = data.token;
       localStorage.setItem('saas_token', authToken);
+      localStorage.setItem('saas_role', data.role || 'admin');
+      localStorage.setItem('saas_client_id', data.clientId || '');
       document.getElementById('loginError').style.display = 'none';
       showApp();
     } else {
@@ -67,6 +69,8 @@ async function doLogin() {
 function doLogout() {
   authToken = '';
   localStorage.removeItem('saas_token');
+  localStorage.removeItem('saas_role');
+  localStorage.removeItem('saas_client_id');
   document.getElementById('appLayout').style.display = 'none';
   document.getElementById('loginPage').style.display = 'flex';
   document.getElementById('passwordInput').value = '';
@@ -75,8 +79,24 @@ function doLogout() {
 function showApp() {
   document.getElementById('loginPage').style.display = 'none';
   document.getElementById('appLayout').style.display = 'flex';
-  loadClients();
-  loadDashboard();
+
+  const role = localStorage.getItem('saas_role') || 'admin';
+  const cId = localStorage.getItem('saas_client_id') || '';
+
+  if (role === 'client') {
+    // Hide administrative navigation elements
+    document.getElementById('navSectionClients').style.display = 'none';
+    document.getElementById('sidebarFilterWrap').style.display = 'none';
+    selectedClientId = cId;
+    loadDashboard();
+  } else {
+    // Show administrative navigation elements
+    document.getElementById('navSectionClients').style.display = 'block';
+    document.getElementById('sidebarFilterWrap').style.display = 'block';
+    selectedClientId = '';
+    loadClients();
+    loadDashboard();
+  }
 }
 
 // ══════════════════════════════════

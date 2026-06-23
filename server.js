@@ -236,14 +236,24 @@ async function downloadMetaMedia(mediaId, accessToken) {
   }
 }
 
-// Simple admin auth middleware
+// Simple auth middleware supporting both Admin and Client keys
 function adminAuth(req, res, next) {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
-  if (token === ADMIN_PASSWORD) return next();
   
-  // Also check query param for simple cases
-  if (req.query.token === ADMIN_PASSWORD) return next();
+  const activeToken = token || req.query.token;
+  if (!activeToken) return res.status(401).json({ error: 'Unauthorized' });
+
+  if (activeToken === ADMIN_PASSWORD) {
+    req.user = { role: 'admin' };
+    return next();
+  }
+
+  if (activeToken.startsWith('CLIENT_TOKEN:')) {
+    const clientId = activeToken.split(':')[1];
+    req.user = { role: 'client', clientId };
+    return next();
+  }
   
   return res.status(401).json({ error: 'Unauthorized' });
 }
@@ -519,7 +529,13 @@ app.get('/api/leads', adminAuth, async (req, res) => {
     .order('updated_at', { ascending: false })
     .limit(parseInt(limit));
 
-  if (client_id) query = query.eq('client_id', client_id);
+  // If user is client, enforce their client_id
+  if (req.user.role === 'client') {
+    query = query.eq('client_id', req.user.clientId);
+  } else if (client_id) {
+    query = query.eq('client_id', client_id);
+  }
+
   if (lead_score) query = query.eq('lead_score', lead_score.toUpperCase());
   if (lead_stage) query = query.eq('lead_stage', lead_stage);
   if (search) query = query.or(`name.ilike.%${search}%,phone.ilike.%${search}%`);
@@ -538,6 +554,11 @@ app.get('/api/leads/:id', adminAuth, async (req, res) => {
     .single();
   if (error) return res.status(404).json({ error: 'Lead not found' });
 
+  // Enforce client access security
+  if (req.user.role === 'client' && lead.client_id !== req.user.clientId) {
+    return res.status(403).json({ error: 'Access denied' });
+  }
+
   const { data: convo } = await supabase
     .from('conversations')
     .select('messages, updated_at')
@@ -549,6 +570,12 @@ app.get('/api/leads/:id', adminAuth, async (req, res) => {
 
 // PUT /api/leads/:id — Update lead (notes, stage, follow-up)
 app.put('/api/leads/:id', adminAuth, async (req, res) => {
+  // Check permission
+  const { data: lead } = await supabase.from('leads').select('client_id').eq('id', req.params.id).single();
+  if (lead && req.user.role === 'client' && lead.client_id !== req.user.clientId) {
+    return res.status(403).json({ error: 'Access denied' });
+  }
+
   const allowedFields = ['notes', 'lead_stage', 'follow_up_date', 'site_visit_date', 'site_visit_time', 'call_date', 'call_time', 'lead_score'];
   const updates = {};
   for (const field of allowedFields) {
@@ -576,7 +603,12 @@ app.get('/api/dashboard/stats', adminAuth, async (req, res) => {
   const { client_id } = req.query;
 
   let query = supabase.from('leads').select('lead_score, lead_stage, site_visit_date, call_date');
-  if (client_id) query = query.eq('client_id', client_id);
+  
+  if (req.user.role === 'client') {
+    query = query.eq('client_id', req.user.clientId);
+  } else if (client_id) {
+    query = query.eq('client_id', client_id);
+  }
 
   const { data: leads, error } = await query;
   if (error) return res.status(500).json({ error: error.message });
@@ -596,14 +628,34 @@ app.get('/api/dashboard/stats', adminAuth, async (req, res) => {
   res.json(stats);
 });
 
-// GET /api/auth — Simple auth check
-app.post('/api/auth', (req, res) => {
+// POST /api/auth — Admin or Client login check
+app.post('/api/auth', async (req, res) => {
   const { password } = req.body;
+  if (!password) return res.status(400).json({ error: 'Password required' });
+
+  // 1. Check Admin password
   if (password === ADMIN_PASSWORD) {
-    res.json({ success: true, token: ADMIN_PASSWORD });
-  } else {
-    res.status(401).json({ error: 'Invalid password' });
+    return res.json({ success: true, token: ADMIN_PASSWORD, role: 'admin' });
   }
+
+  // 2. Check Client passwords in Supabase Database
+  try {
+    const { data, error } = await supabase
+      .from('clients')
+      .select('id, name')
+      .eq('verify_token', password) // Use verify_token as client password or a dedicated field. Let's use verify_token for simplicity or a custom column.
+      .eq('status', 'active')
+      .single();
+
+    if (data) {
+      // Return a client-prefixed token containing client ID
+      return res.json({ success: true, token: `CLIENT_TOKEN:${data.id}`, role: 'client', clientId: data.id });
+    }
+  } catch (e) {
+    console.error('Client auth DB check error:', e);
+  }
+
+  res.status(401).json({ error: 'Invalid password' });
 });
 
 // ─────────────────────────────────────────────
