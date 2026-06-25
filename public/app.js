@@ -435,6 +435,8 @@ async function openClientEdit(clientId, e) {
   document.getElementById('clientModalTitle').textContent = `Edit: ${client.name}`;
   document.getElementById('edit_status').value = client.status;
   document.getElementById('edit_system_prompt').value = client.system_prompt || '';
+  document.getElementById('edit_gemini_key').value = client.gemini_api_key || '';
+  document.getElementById('edit_password').value = ''; // Reset password field
   document.getElementById('edit_knowledge_base').value =
     typeof client.knowledge_base === 'string' ? client.knowledge_base : JSON.stringify(client.knowledge_base, null, 2);
 }
@@ -442,6 +444,9 @@ async function openClientEdit(clientId, e) {
 async function saveClientEdit() {
   const system_prompt = document.getElementById('edit_system_prompt').value.trim();
   const status = document.getElementById('edit_status').value;
+  const gemini_api_key = document.getElementById('edit_gemini_key').value.trim() || null;
+  const password = document.getElementById('edit_password').value.trim();
+
   let knowledge_base;
   const kbRaw = document.getElementById('edit_knowledge_base').value.trim();
   try {
@@ -451,9 +456,14 @@ async function saveClientEdit() {
     return;
   }
 
+  const payload = { system_prompt, status, knowledge_base, gemini_api_key };
+  if (password) {
+    payload.verify_token = password;
+  }
+
   const res = await fetch(`${API}/api/clients/${currentClientEditId}`, {
     method: 'PUT', headers: headers(),
-    body: JSON.stringify({ system_prompt, status, knowledge_base })
+    body: JSON.stringify(payload)
   });
   if (res.ok) {
     closeModal('clientModal');
