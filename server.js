@@ -186,6 +186,88 @@ CRITICAL TIME CONTEXT FOR SCHEDULING:
   throw lastError;
 }
 
+// Generate customized System Prompt via Gemini 2.5 Flash using Master template
+async function generateClientPromptViaGemini(description) {
+  const apiKey = DEFAULT_GEMINI_KEY;
+  if (!apiKey) {
+    throw new Error('Gemini API key is not configured on the server.');
+  }
+
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+
+  const systemInstruction = `You are an expert AI Prompt Engineer. Your task is to generate a highly optimized WhatsApp Chatbot System Prompt for a client based on a brief description.
+
+You must follow this exact template structure and output ONLY the generated prompt. Do not add any markdown block code wrappers like \`\`\` or extra conversational comments. Just return the prompt text directly.
+
+TEMPLATE STRUCTURE to output:
+---
+## CRITICAL RULES (STRICT CONSTRAINTS)
+
+1. **MOSTLY SPEAK IN HINGLISH**: Speak in Hinglish (Hindi written in Roman English script). This is the default, primary, and absolute communication style.
+2. **EXTREMELY SHORT & CRISP**: Keep your responses to 1 to 2 sentences maximum. Never send long text paragraphs.
+3. **ASK EXACTLY ONE QUESTION**: Always ask exactly one question at a time.
+4. **REVIEW HISTORY**: Never ask for information that the user has already provided.
+
+## ROLE
+You are an expert Lead Qualification and Site Visit Conversion Consultant working for [Client Name].
+
+Your primary responsibility is to understand the buyer's requirements, qualify the lead, identify suitable projects, and guide the prospect toward scheduling a site visit or consultation call.
+
+## CONTEXT
+[Context about the client's business, property types, projects, focus areas, and tone. Synthesize this from the description.]
+
+## FIRST MESSAGE RULE
+The first message must ALWAYS be in Hinglish/Conversational Hindi.
+Start with: "Namaste! Main [Bot Name/Assistant Name] hoon. [Friendly welcoming line tailored to this client's business]"
+
+## LEAD QUALIFICATION FRAMEWORK
+[Define what to collect: e.g. Budget Range, Purchase Purpose, Timeline, Preferred Location, or other fields mentioned in description.]
+
+## STATE EXTRACTION RULE
+At the absolute end of your response, output: [STATE]{"name": "...", "budget": "...", "location": "...", "propertyType": "...", "purpose": "...", "timeline": "...", "phone": "...", "email": "...", "leadScore": "HOT/WARM/COLD/UNKNOWN", "matchedProjectIds": [], "siteVisitDate": "...", "siteVisitTime": "...", "callDate": "...", "callTime": "..."}[/STATE]
+---
+
+Based on the description provided by the user, fill in the placeholders ([Client Name], [Context], [Bot Name/Assistant Name], [Friendly welcoming line], etc.) and tailor the content to match their specific business focus and requirements.`;
+
+  const payload = {
+    contents: [
+      {
+        parts: [
+          { text: `Description: ${description}` }
+        ]
+      }
+    ],
+    systemInstruction: {
+      parts: [
+        { text: systemInstruction }
+      ]
+    },
+    generationConfig: {
+      temperature: 0.7,
+      topP: 0.95,
+      maxOutputTokens: 1500
+    }
+  };
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+
+  if (!response.ok) {
+    throw new Error(`HTTP \${response.status}: \${await response.text()}`);
+  }
+
+  const data = await response.json();
+  const generatedText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!generatedText) {
+    throw new Error('Gemini API returned an empty response.');
+  }
+
+  return generatedText.trim();
+}
+
 // Send WhatsApp message via Meta Cloud API
 async function sendWhatsAppMessage(phoneNumberId, to, text, accessToken) {
   const token = accessToken || process.env.WHATSAPP_ACCESS_TOKEN;
@@ -486,6 +568,20 @@ app.post('/api/clients', adminAuth, async (req, res) => {
   res.json({ success: true, client: data });
 });
 
+// POST /api/clients/generate-prompt — Generate system prompt via Gemini
+app.post('/api/clients/generate-prompt', adminAuth, async (req, res) => {
+  const { description } = req.body;
+  if (!description) return res.status(400).json({ error: 'Description is required' });
+
+  try {
+    const prompt = await generateClientPromptViaGemini(description);
+    res.json({ success: true, prompt });
+  } catch (error) {
+    console.error('Gemini prompt generation error:', error);
+    res.status(500).json({ error: error.message || 'Failed to generate prompt' });
+  }
+});
+
 // PUT /api/clients/:id — Update client
 app.put('/api/clients/:id', adminAuth, async (req, res) => {
   const allowedFields = [
@@ -688,27 +784,70 @@ app.post('/api/auth', async (req, res) => {
   res.status(401).json({ error: 'Invalid credentials or password' });
 });
 
-// POST /api/auth/forgot — Client forgot password recovery
-app.post('/api/auth/forgot', async (req, res) => {
-  const { email } = req.body;
-  if (!email) return res.status(400).json({ error: 'Email is required' });
+// POST /api/auth/forgot-verify — Verify client identity by Email/Phone/WhatsApp
+app.post('/api/auth/forgot-verify', async (req, res) => {
+  const { identifier } = req.body;
+  if (!identifier) return res.status(400).json({ error: 'Email or WhatsApp number is required' });
+
+  try {
+    const { data: clients, error } = await supabase
+      .from('clients')
+      .select('id, name, whatsapp_number, contact_phone, contact_email')
+      .eq('status', 'active');
+
+    if (error || !clients) return res.status(404).json({ error: 'Identity details mismatch or no active clients found.' });
+
+    const cleanId = identifier.replace(/[^0-9]/g, '');
+    const searchEmail = identifier.trim().toLowerCase();
+
+    const client = clients.find(c => {
+      const cleanWa = (c.whatsapp_number || '').replace(/[^0-9]/g, '');
+      const cleanPhone = (c.contact_phone || '').replace(/[^0-9]/g, '');
+      const clientEmail = (c.contact_email || '').trim().toLowerCase();
+
+      const identifierMatches = (
+        (cleanId && cleanWa.endsWith(cleanId)) || 
+        (cleanId && cleanPhone.endsWith(cleanId)) || 
+        (clientEmail && clientEmail === searchEmail)
+      );
+
+      return identifierMatches;
+    });
+
+    if (!client) {
+      return res.status(404).json({ error: 'No active client found with this WhatsApp number or Email' });
+    }
+
+    return res.json({ success: true, clientId: client.id, name: client.name });
+  } catch (e) {
+    console.error('Verify identity DB error:', e);
+    return res.status(500).json({ error: 'Database search failed' });
+  }
+});
+
+// POST /api/auth/forgot-reset — Set new password
+app.post('/api/auth/forgot-reset', async (req, res) => {
+  const { clientId, password } = req.body;
+  if (!clientId || !password) {
+    return res.status(400).json({ error: 'Client ID and new password are required' });
+  }
 
   try {
     const { data, error } = await supabase
       .from('clients')
-      .select('name, verify_token')
-      .eq('contact_email', email.trim().toLowerCase())
-      .eq('status', 'active')
+      .update({ verify_token: password, updated_at: new Date().toISOString() })
+      .eq('id', clientId)
+      .select()
       .single();
 
     if (error || !data) {
-      return res.status(404).json({ error: 'No active client registered with this email address' });
+      return res.status(500).json({ error: error ? error.message : 'Client not found or update failed' });
     }
 
-    // Return the verify token as password recovery details
-    return res.json({ success: true, name: data.name, password: data.verify_token });
+    return res.json({ success: true });
   } catch (e) {
-    return res.status(500).json({ error: 'Database search failed' });
+    console.error('Reset password DB error:', e);
+    return res.status(500).json({ error: 'Database update failed' });
   }
 });
 

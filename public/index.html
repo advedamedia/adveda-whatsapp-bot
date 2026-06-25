@@ -383,8 +383,18 @@
 
           <div class="form-group">
             <label>System Prompt <span class="required">*</span></label>
+            
+            <!-- AI Prompt Builder Helper -->
+            <div class="ai-prompt-helper" style="margin-bottom: 12px; padding: 12px; border: 1px dashed var(--primary); border-radius: 8px; background: rgba(103, 232, 249, 0.03);">
+              <h4 style="margin: 0 0 8px 0; color: var(--primary); font-size: 13px; display: flex; align-items: center; gap: 6px;">✨ AI Prompt Builder</h4>
+              <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                <input type="text" id="ob_ai_desc" placeholder="e.g. Client Name: ABC Builders, Focus: Luxury Villas, Tone: Semi-formal" style="font-size: 12px; padding: 8px; flex: 1; min-width: 200px; background: var(--bg-surface); border: 1px solid var(--border); color: var(--text); border-radius: 4px;"/>
+                <button type="button" class="btn btn-primary btn-sm" onclick="generateSystemPrompt('ob_ai_desc', 'ob_system_prompt', this)" style="padding: 6px 12px; font-size: 12px;">Generate Prompt with AI 🚀</button>
+              </div>
+            </div>
+
             <textarea id="ob_system_prompt" rows="12" placeholder="Bot ki poori instructions yahan paste karein...&#10;&#10;Example:&#10;You are [Bot Name], a [role] for [company name].&#10;Speak in Hinglish...&#10;Your goal is to..."></textarea>
-            <div class="input-hint">Antigravity mein naya chat karo aur wahan se apna system prompt generate karwao, phir yahan paste karo.</div>
+            <div class="input-hint">Aap AI Prompt Builder mein simple details enter karke automatic prompt generate kar sakte hain, ya manually paste kar sakte hain.</div>
           </div>
 
           <div class="form-group">
@@ -535,6 +545,16 @@
       </div>
       <div class="form-group">
         <label>System Prompt</label>
+
+        <!-- AI Prompt Builder Helper (Edit Modal) -->
+        <div class="ai-prompt-helper" style="margin-bottom: 12px; padding: 12px; border: 1px dashed var(--primary); border-radius: 8px; background: rgba(103, 232, 249, 0.03);">
+          <h4 style="margin: 0 0 8px 0; color: var(--primary); font-size: 13px; display: flex; align-items: center; gap: 6px;">✨ AI Prompt Builder</h4>
+          <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+            <input type="text" id="edit_ai_desc" placeholder="e.g. Client Name: ABC Builders, Focus: Luxury Villas, Tone: Semi-formal" style="font-size: 12px; padding: 8px; flex: 1; min-width: 200px; background: var(--bg-surface); border: 1px solid var(--border); color: var(--text); border-radius: 4px;"/>
+            <button type="button" class="btn btn-primary btn-sm" onclick="generateSystemPrompt('edit_ai_desc', 'edit_system_prompt', this)" style="padding: 6px 12px; font-size: 12px;">Generate Prompt with AI 🚀</button>
+          </div>
+        </div>
+
         <textarea id="edit_system_prompt" rows="10"></textarea>
       </div>
       <div class="form-group">
@@ -553,24 +573,44 @@
      FORGOT PASSWORD MODAL
      ══════════════════════════════════ -->
 <div class="modal-overlay" id="forgotPasswordModal">
-  <div class="modal" style="max-width:420px">
+  <div class="modal" style="max-width:440px">
     <div class="modal-header">
       <div><h2>Reset Password</h2></div>
       <button class="modal-close" onclick="closeModal('forgotPasswordModal')">✕</button>
     </div>
     <div class="modal-body">
       <div id="forgotModalMsg"></div>
-      <p style="font-size:13px;color:var(--text-secondary);margin-bottom:16px">
-        Apna registered email address enter karein. Agar details match hoti hain, toh hum aapko verify token / password display kar denge.
-      </p>
-      <div class="form-group">
-        <label for="forgotEmailInput">Registered Email Address</label>
-        <input type="email" id="forgotEmailInput" placeholder="e.g. client@email.com"/>
+      
+      <!-- Step 1: Verify Identity -->
+      <div id="forgotStep1">
+        <p style="font-size:13px;color:var(--text-secondary);margin-bottom:16px">
+          Apna registered Email Address ya WhatsApp number enter karein.
+        </p>
+        <div class="form-group">
+          <label for="forgotEmailInput">Registered Email / WhatsApp Number</label>
+          <input type="text" id="forgotEmailInput" placeholder="e.g. client@email.com or 9999888877"/>
+        </div>
+        <button class="btn btn-primary" onclick="verifyForgotIdentity()" id="forgotVerifyBtn" style="width:100%;margin-top:10px">
+          Verify Identity →
+        </button>
+      </div>
+
+      <!-- Step 2: Set New Password -->
+      <div id="forgotStep2" style="display:none">
+        <p style="font-size:13px;color:var(--text-secondary);margin-bottom:16px">
+          Kanak system ne details verify kar li hain. Naya password type karein.
+        </p>
+        <div class="form-group">
+          <label for="forgotNewPasswordInput">New Password</label>
+          <input type="password" id="forgotNewPasswordInput" placeholder="Enter new password"/>
+        </div>
+        <button class="btn btn-success" onclick="resetForgotNewPassword()" id="forgotResetBtn" style="width:100%;margin-top:10px">
+          Set New Password ✅
+        </button>
       </div>
     </div>
     <div class="modal-footer">
-      <button class="btn btn-secondary" onclick="closeModal('forgotPasswordModal')">Close</button>
-      <button class="btn btn-primary" onclick="submitForgotPassword()">Find Password</button>
+      <button class="btn btn-secondary" onclick="closeModal('forgotPasswordModal')">Cancel</button>
     </div>
   </div>
 </div>

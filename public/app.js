@@ -631,45 +631,110 @@ async function copyText(elemId, btn) {
   setTimeout(() => { btn.textContent = '📋 Copy'; btn.classList.remove('copied'); }, 2000);
 }
 
-// ══════════════════════════════════
-//  FORGOT PASSWORD ACTIONS
-// ══════════════════════════════════
+let forgotClientId = '';
+
 function showForgotPassword(e) {
   e?.preventDefault();
   document.getElementById('forgotEmailInput').value = '';
   document.getElementById('forgotModalMsg').innerHTML = '';
+  document.getElementById('forgotStep1').style.display = 'block';
+  document.getElementById('forgotStep2').style.display = 'none';
+  forgotClientId = '';
   openModal('forgotPasswordModal');
 }
 
-async function submitForgotPassword() {
-  const email = document.getElementById('forgotEmailInput').value.trim();
-  if (!email) {
-    document.getElementById('forgotModalMsg').innerHTML = '<div class="alert alert-error">❌ Email register hona zaroori hai.</div>';
+async function verifyForgotIdentity() {
+  const identifier = document.getElementById('forgotEmailInput').value.trim();
+  if (!identifier) {
+    document.getElementById('forgotModalMsg').innerHTML = '<div class="alert alert-error">❌ Identifier fill karna zaroori hai.</div>';
     return;
   }
 
   const msgDiv = document.getElementById('forgotModalMsg');
-  msgDiv.innerHTML = '<span class="spinner"></span> Searching database...';
+  msgDiv.innerHTML = '<span class="spinner"></span> Verifying identity...';
 
   try {
-    const res = await fetch(`${API}/api/auth/forgot`, {
+    const res = await fetch(`${API}/api/auth/forgot-verify`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email })
+      body: JSON.stringify({ identifier })
     });
     const data = await res.json();
-    if (res.ok && data.password) {
-      msgDiv.innerHTML = `
-        <div class="alert alert-success" style="line-height:1.6">
-          ✅ Account match ho gaya!<br/>
-          <strong>Client Name:</strong> ${data.name}<br/>
-          <strong>Aapka Password:</strong> <code style="background:rgba(255,255,255,0.15);padding:2px 6px;border-radius:4px;font-family:monospace;font-size:14px">${data.password}</code>
-        </div>
-      `;
+    if (res.ok && data.clientId) {
+      forgotClientId = data.clientId;
+      msgDiv.innerHTML = `<div class="alert alert-success">✅ Identity verified for <strong>${data.name}</strong>. Set your new password below.</div>`;
+      document.getElementById('forgotStep1').style.display = 'none';
+      document.getElementById('forgotStep2').style.display = 'block';
+      document.getElementById('forgotNewPasswordInput').value = '';
     } else {
-      msgDiv.innerHTML = `<div class="alert alert-error">❌ ${data.error || 'Email match nahi hua.'}</div>`;
+      msgDiv.innerHTML = `<div class="alert alert-error">❌ ${data.error || 'Identity details mismatch.'}</div>`;
     }
   } catch (e) {
     msgDiv.innerHTML = '<div class="alert alert-error">❌ Connection error. Please try again.</div>';
+  }
+}
+
+async function resetForgotNewPassword() {
+  const newPassword = document.getElementById('forgotNewPasswordInput').value.trim();
+  if (!newPassword) {
+    document.getElementById('forgotModalMsg').innerHTML = '<div class="alert alert-error">❌ Password text cannot be empty.</div>';
+    return;
+  }
+
+  const msgDiv = document.getElementById('forgotModalMsg');
+  msgDiv.innerHTML = '<span class="spinner"></span> Resetting your password...';
+
+  try {
+    const res = await fetch(`${API}/api/auth/forgot-reset`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ clientId: forgotClientId, password: newPassword })
+    });
+    const data = await res.json();
+    if (res.ok && data.success) {
+      msgDiv.innerHTML = '<div class="alert alert-success">✅ Password has been reset successfully! You can login now.</div>';
+      document.getElementById('forgotStep2').style.display = 'none';
+      setTimeout(() => {
+        closeModal('forgotPasswordModal');
+      }, 2500);
+    } else {
+      msgDiv.innerHTML = `<div class="alert alert-error">❌ ${data.error || 'Failed to update password.'}</div>`;
+    }
+  } catch (e) {
+    msgDiv.innerHTML = '<div class="alert alert-error">❌ Connection error. Please try again.</div>';
+  }
+}
+
+async function generateSystemPrompt(descId, targetId, btn) {
+  const descVal = document.getElementById(descId).value.trim();
+  if (!descVal) {
+    alert('Please describe your client first (e.g. Client Name, Focus, Tone).');
+    return;
+  }
+
+  const originalHtml = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Generating...';
+
+  try {
+    const res = await fetch(`${API}/api/clients/generate-prompt`, {
+      method: 'POST',
+      headers: headers(),
+      body: JSON.stringify({ description: descVal })
+    });
+    const data = await res.json();
+    if (res.ok && data.prompt) {
+      document.getElementById(targetId).value = data.prompt;
+      // Clear description box after success
+      document.getElementById(descId).value = '';
+    } else {
+      alert('Error: ' + (data.error || 'Failed to generate prompt. Please try again.'));
+    }
+  } catch (e) {
+    console.error('Error generating prompt:', e);
+    alert('Failed to connect to prompt generation service.');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = originalHtml;
   }
 }
